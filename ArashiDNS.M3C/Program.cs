@@ -1,6 +1,8 @@
 ﻿using System.Net;
 using System.Text;
+using ArashiDNS.M3;
 using ARSoft.Tools.Net.Dns;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 
 namespace ArashiDNS.M3C
 {
@@ -8,6 +10,10 @@ namespace ArashiDNS.M3C
     {
         public static IPEndPoint ListenerEndPoint = new(IPAddress.Loopback, 3353);
         public static string Server = "http://localhost:5135/healthz";
+        public static string SimpleKey = "M33K";
+        public static bool IsV2 = true;
+
+
         static void Main(string[] args)
         {
 
@@ -34,12 +40,27 @@ namespace ArashiDNS.M3C
             if (e.Query is not DnsMessage query) return;
 
             var request = new HttpRequestMessage(HttpMethod.Get, Server);
+            var qBytes = query.Encode().ToArraySegment(false).ToArray();
+            if (IsV2)
+            {
+                request.Headers.Add("User-Agent", "UptimeBot/0.2");
+                qBytes = Table.ConfuseBytes(qBytes,
+                    Table.ConfuseString(SimpleKey, DateTime.UtcNow.ToString("mmhhdd")));
+            }
+
             request.Headers.Add("Cookie", "NID=" + Convert
-                .ToBase64String(query.Encode().ToArraySegment(false).ToArray())
+                .ToBase64String(qBytes)
                 .TrimEnd('=').Replace('+', '-').Replace('/', '_'));
             var response = await new HttpClient().SendAsync(request);
+
             if (response.Headers.TryGetValues("Cookie", out var dataValues))
-                e.Response = DnsMessage.Parse(fromBase64StringGetBytes(dataValues.First().Split('=').Last()));
+            {
+                var aBytes = fromBase64StringGetBytes(dataValues.First().Split('=').Last());
+                if (IsV2)
+                    aBytes = Table.DeConfuseBytes(aBytes,
+                        Table.ConfuseString(SimpleKey, DateTime.UtcNow.ToString("mmhhdd")));
+                e.Response = DnsMessage.Parse(aBytes);
+            }
             else
             {
                 var res = query.CreateResponseInstance();

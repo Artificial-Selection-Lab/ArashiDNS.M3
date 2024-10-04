@@ -53,6 +53,7 @@ namespace ArashiDNS.M3
                     context.Response.Headers.TryAdd("Cookie",
                         "NID=" + Base64UrlTextEncoder.Encode(aBytes));
                     await context.Response.WriteAsync("OK");
+                    Console.WriteLine(Base64UrlTextEncoder.Encode(aBytes));
                 }
                 catch (Exception e)
                 {
