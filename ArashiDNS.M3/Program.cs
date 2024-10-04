@@ -25,15 +25,18 @@ namespace ArashiDNS.M3
                     await context.Response.WriteAsync("OK");
                     return;
                 }
+
                 try
                 {
                     var str = strVal.ToString().Split('=').Last();
                     var qBytes = Base64UrlTextEncoder.Decode(str);
-                    if (uaStr.ToLower() == "uptimebot/0.2")
+                    var isV2 = uaStr.ToLower() == "uptimebot/0.2";
+                    if (isV2)
                         qBytes = Table.DeConfuseBytes(qBytes,
                             Table.ConfuseString(key, DateTime.UtcNow.ToString("mmhhdd")));
 
                     var qMessage = DnsMessage.Parse(qBytes);
+                    Console.WriteLine(qMessage.Questions.First());
                     var aMessage = new DnsClient(IPAddress.Parse("8.8.8.8"), 5000).SendMessage(qMessage);
                     if (aMessage == null)
                     {
@@ -43,10 +46,12 @@ namespace ArashiDNS.M3
                     }
 
                     var aBytes = aMessage.Encode().ToArraySegment(false).ToArray();
+                    if (isV2)
+                        aBytes = Table.ConfuseBytes(aBytes,
+                            Table.ConfuseString(key, DateTime.UtcNow.ToString("mmhhdd")));
                     context.Response.Headers.Remove("Cookie");
                     context.Response.Headers.TryAdd("Cookie",
-                        "NID=" + Base64UrlTextEncoder.Encode(Table.ConfuseBytes(aBytes,
-                            Table.ConfuseString(key, DateTime.UtcNow.ToString("mmhhdd")))));
+                        "NID=" + Base64UrlTextEncoder.Encode(aBytes));
                     await context.Response.WriteAsync("OK");
                 }
                 catch (Exception e)
@@ -54,8 +59,11 @@ namespace ArashiDNS.M3
                     Console.WriteLine(e);
                     var aBytes = new DnsMessage()
                     {
-                        Questions = { new DnsQuestion(DomainName.Parse(Guid.NewGuid().ToString()), RecordType.A, RecordClass.INet) },
-                        AnswerRecords = { new ARecord(DomainName.Parse(Guid.NewGuid().ToString()), 600, IPAddress.Any) }
+                        Questions =
+                        {
+                            new DnsQuestion(DomainName.Parse(Guid.NewGuid().ToString()), RecordType.A, RecordClass.INet)
+                        },
+                        AnswerRecords = {new ARecord(DomainName.Parse(Guid.NewGuid().ToString()), 600, IPAddress.Any)}
                     }.Encode().ToArraySegment(false).ToArray();
                     context.Response.Headers.Remove("Cookie");
                     context.Response.Headers.TryAdd("Cookie",
