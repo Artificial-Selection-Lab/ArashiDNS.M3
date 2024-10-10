@@ -41,6 +41,7 @@ namespace ArashiDNS.M3C
 
             var request = new HttpRequestMessage(HttpMethod.Get, Server);
             var qBytes = query.Encode().ToArraySegment(false).ToArray();
+            qBytes = BrotliCompress.Compress(qBytes);
             if (IsV2)
             {
                 request.Headers.Add("User-Agent", "UptimeBot/0.2");
@@ -59,6 +60,7 @@ namespace ArashiDNS.M3C
                 if (IsV2)
                     aBytes = Table.DeConfuseBytes(aBytes,
                         Table.ConfuseString(SimpleKey, DateTime.UtcNow.ToString("mmhhdd")));
+                aBytes = BrotliCompress.Decompress(aBytes);
                 e.Response = DnsMessage.Parse(aBytes);
             }
             else

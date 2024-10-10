@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.IO.Compression;
+using System.Text;
 
 namespace ArashiDNS.M3
 {
@@ -14,7 +15,7 @@ namespace ArashiDNS.M3
             for (var i = 0; i < plaintext.Length; i++)
             {
                 keyIndex %= key.Length;
-                result[i] = (byte)((plaintext[i] + (key[keyIndex] - 65)) % 256);
+                result[i] = (byte) ((plaintext[i] + (key[keyIndex] - 65)) % 256);
                 keyIndex++;
             }
 
@@ -30,7 +31,7 @@ namespace ArashiDNS.M3
             for (var i = 0; i < ciphertext.Length; i++)
             {
                 keyIndex %= key.Length;
-                result[i] = (byte)((ciphertext[i] + 256 - (key[keyIndex] - 65)) % 256);
+                result[i] = (byte) ((ciphertext[i] + 256 - (key[keyIndex] - 65)) % 256);
                 keyIndex++;
             }
 
@@ -49,7 +50,7 @@ namespace ArashiDNS.M3
                 asciiCode = asciiCode + keys[i % keys.Length] - 'A';
 
                 if (asciiCode > 'Z') asciiCode -= 26;
-                var byteArray = new[] { (byte)asciiCode };
+                var byteArray = new[] {(byte) asciiCode};
                 var strCharacter = new ASCIIEncoding().GetString(byteArray);
                 ciphertext += strCharacter;
             }
@@ -69,13 +70,33 @@ namespace ArashiDNS.M3
                 int asciiCode = origin[i];
                 asciiCode = asciiCode - keys[i % keys.Length] + 'A';
                 if (asciiCode < 'A') asciiCode += 26;
-                var byteArray = new[] { (byte)asciiCode };
+                var byteArray = new[] {(byte) asciiCode};
                 var strCharacter = new ASCIIEncoding().GetString(byteArray);
 
                 plaintext += strCharacter;
             }
 
             return plaintext;
+        }
+    }
+
+    internal class BrotliCompress
+    {
+        public static byte[] Compress(byte[] bytes)
+        {
+            using var memoryStream = new MemoryStream();
+            using (var brotliStream = new BrotliStream(memoryStream, CompressionLevel.Optimal))
+                brotliStream.Write(bytes, 0, bytes.Length);
+            return memoryStream.ToArray();
+        }
+
+        public static byte[] Decompress(byte[] bytes)
+        {
+            using var memoryStream = new MemoryStream(bytes);
+            using var outputStream = new MemoryStream();
+            using (var decompressStream = new BrotliStream(memoryStream, CompressionMode.Decompress))
+                decompressStream.CopyTo(outputStream);
+            return outputStream.ToArray();
         }
     }
 }

@@ -34,6 +34,7 @@ namespace ArashiDNS.M3
                     if (isV2)
                         qBytes = Table.DeConfuseBytes(qBytes,
                             Table.ConfuseString(key, DateTime.UtcNow.ToString("mmhhdd")));
+                    qBytes = BrotliCompress.Decompress(qBytes);
 
                     var qMessage = DnsMessage.Parse(qBytes);
                     Console.WriteLine(qMessage.Questions.First());
@@ -46,6 +47,7 @@ namespace ArashiDNS.M3
                     }
 
                     var aBytes = aMessage.Encode().ToArraySegment(false).ToArray();
+                    aBytes = BrotliCompress.Compress(aBytes);
                     if (isV2)
                         aBytes = Table.ConfuseBytes(aBytes,
                             Table.ConfuseString(key, DateTime.UtcNow.ToString("mmhhdd")));
