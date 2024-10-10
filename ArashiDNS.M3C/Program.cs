@@ -3,11 +3,15 @@ using System.Text;
 using ArashiDNS.M3;
 using ARSoft.Tools.Net.Dns;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ArashiDNS.M3C
 {
     internal class Program
     {
+        public static IServiceProvider ServiceProvider = new ServiceCollection().AddHttpClient().BuildServiceProvider();
+        public static IHttpClientFactory? ClientFactory = ServiceProvider.GetService<IHttpClientFactory>();
+
         public static IPEndPoint ListenerEndPoint = new(IPAddress.Loopback, 3353);
         public static string Server = "http://localhost:5135/healthz";
         public static string SimpleKey = "M33K";
@@ -52,22 +56,29 @@ namespace ArashiDNS.M3C
             request.Headers.Add("Cookie", "NID=" + Convert
                 .ToBase64String(qBytes)
                 .TrimEnd('=').Replace('+', '-').Replace('/', '_'));
-            var response = await new HttpClient().SendAsync(request);
 
-            if (response.Headers.TryGetValues("Cookie", out var dataValues))
+            if (ClientFactory != null)
             {
-                var aBytes = fromBase64StringGetBytes(dataValues.First().Split('=').Last());
-                if (IsV2)
-                    aBytes = Table.DeConfuseBytes(aBytes,
-                        Table.ConfuseString(SimpleKey, DateTime.UtcNow.ToString("mmhhdd")));
-                aBytes = BrotliCompress.Decompress(aBytes);
-                e.Response = DnsMessage.Parse(aBytes);
-            }
-            else
-            {
-                var res = query.CreateResponseInstance();
-                res.ReturnCode = ReturnCode.ServerFailure;
-                e.Response = res;
+                var client = ClientFactory.CreateClient();
+                client.DefaultRequestHeaders.Add("Connection", "keep-alive");
+                client.DefaultRequestHeaders.Add("Keep-Alive", "600");
+                var response = await client.SendAsync(request);
+
+                if (response.Headers.TryGetValues("Cookie", out var dataValues))
+                {
+                    var aBytes = fromBase64StringGetBytes(dataValues.First().Split('=').Last());
+                    if (IsV2)
+                        aBytes = Table.DeConfuseBytes(aBytes,
+                            Table.ConfuseString(SimpleKey, DateTime.UtcNow.ToString("mmhhdd")));
+                    aBytes = BrotliCompress.Decompress(aBytes);
+                    e.Response = DnsMessage.Parse(aBytes);
+                }
+                else
+                {
+                    var res = query.CreateResponseInstance();
+                    res.ReturnCode = ReturnCode.ServerFailure;
+                    e.Response = res;
+                }
             }
         }
 

@@ -37,8 +37,8 @@ namespace ArashiDNS.M3
                     qBytes = BrotliCompress.Decompress(qBytes);
 
                     var qMessage = DnsMessage.Parse(qBytes);
-                    Console.WriteLine(qMessage.Questions.First());
-                    var aMessage = new DnsClient(IPAddress.Parse("8.8.8.8"), 5000).SendMessage(qMessage);
+                    //Console.WriteLine(qMessage.Questions.First());
+                    var aMessage = new DnsClient(IPAddress.Parse("127.0.0.1"), 5000).SendMessage(qMessage);
                     if (aMessage == null)
                     {
                         context.Response.StatusCode = 500;
@@ -55,7 +55,7 @@ namespace ArashiDNS.M3
                     context.Response.Headers.TryAdd("Cookie",
                         "NID=" + Base64UrlTextEncoder.Encode(aBytes));
                     await context.Response.WriteAsync("OK");
-                    Console.WriteLine(Base64UrlTextEncoder.Encode(aBytes));
+                    //Console.WriteLine(Base64UrlTextEncoder.Encode(aBytes));
                 }
                 catch (Exception e)
                 {
