@@ -12,11 +12,11 @@ namespace ArashiDNS.M3
         {
             var builder = WebApplication.CreateBuilder(args);
             var app = builder.Build();
-            var nid = "NID";
-            var path = args.FirstOrDefault(x => x.StartsWith("--path="))?.Split("=").LastOrDefault() ?? "healthz";
-            var up = IPAddress.Parse(args.FirstOrDefault(x => x.StartsWith("--up="))?.Split("=").LastOrDefault() ??
+            var nid = args.FirstOrDefault(x => x.StartsWith("--nid="))?.Split("=").LastOrDefault()?.Trim('\"') ?? "NID";
+            var path = args.FirstOrDefault(x => x.StartsWith("--path="))?.Split("=").LastOrDefault()?.Trim('\"') ?? "healthz";
+            var up = IPAddress.Parse(args.FirstOrDefault(x => x.StartsWith("--up="))?.Split("=").LastOrDefault()?.Trim('\"') ??
                                      "8.8.8.8");
-            var key = args.FirstOrDefault(x => x.StartsWith("--key="))?.Split("=").LastOrDefault() ??
+            var key = args.FirstOrDefault(x => x.StartsWith("--key="))?.Split("=").LastOrDefault()?.Trim('\"') ??
                       Guid.NewGuid().ToString().Replace("-", "");
             Console.WriteLine("Key  :" + key);
             Console.WriteLine("Up   :" + up);
