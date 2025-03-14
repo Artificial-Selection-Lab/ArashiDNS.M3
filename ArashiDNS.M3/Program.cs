@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text;
 using ARSoft.Tools.Net;
 using ARSoft.Tools.Net.Dns;
 using Microsoft.AspNetCore.WebUtilities;
@@ -13,14 +12,24 @@ namespace ArashiDNS.M3
         {
             var builder = WebApplication.CreateBuilder(args);
             var app = builder.Build();
-            var key = "M33K";
+            var nid = "NID";
+            var path = args.FirstOrDefault(x => x.StartsWith("--path="))?.Split("=").LastOrDefault() ?? "healthz";
+            var up = IPAddress.Parse(args.FirstOrDefault(x => x.StartsWith("--up="))?.Split("=").LastOrDefault() ??
+                                     "8.8.8.8");
+            var key = args.FirstOrDefault(x => x.StartsWith("--key="))?.Split("=").LastOrDefault() ??
+                      Guid.NewGuid().ToString().Replace("-", "");
+            Console.WriteLine("Key  :" + key);
+            Console.WriteLine("Up   :" + up);
+            Console.WriteLine("Path :" + path);
+            Console.WriteLine("Do NOT use HTTPS, this breaks anti-strangeness.");
 
-            app.Map("/healthz", async (HttpContext context) =>
+            app.Map("/" + path, async context =>
             {
                 var uaStr = context.Request.Headers.TryGetValue("User-Agent", out var uaVal)
                     ? uaVal.ToString()
                     : Empty;
-                if (!context.Request.Headers.TryGetValue("Cookie", out var strVal) || IsNullOrWhiteSpace(strVal.ToString()))
+                if (!context.Request.Headers.TryGetValue("Cookie", out var strVal) ||
+                    IsNullOrWhiteSpace(strVal.ToString()))
                 {
                     await context.Response.WriteAsync("OK");
                     return;
@@ -30,15 +39,15 @@ namespace ArashiDNS.M3
                 {
                     var str = strVal.ToString().Split('=').Last();
                     var qBytes = Base64UrlTextEncoder.Decode(str);
-                    var isV2 = uaStr.ToLower() == "uptimebot/0.2";
-                    if (isV2)
+                    var isConfused = uaStr.ToLower() == "uptimebot/0.2";
+                    if (isConfused)
                         qBytes = Table.DeConfuseBytes(qBytes,
                             Table.ConfuseString(key, DateTime.UtcNow.ToString("mmhhdd")));
                     qBytes = BrotliCompress.Decompress(qBytes);
 
                     var qMessage = DnsMessage.Parse(qBytes);
                     //Console.WriteLine(qMessage.Questions.First());
-                    var aMessage = new DnsClient(IPAddress.Parse("127.0.0.1"), 5000).SendMessage(qMessage);
+                    var aMessage = await new DnsClient(up, 5000).SendMessageAsync(qMessage);
                     if (aMessage == null)
                     {
                         context.Response.StatusCode = 500;
@@ -48,12 +57,12 @@ namespace ArashiDNS.M3
 
                     var aBytes = aMessage.Encode().ToArraySegment(false).ToArray();
                     aBytes = BrotliCompress.Compress(aBytes);
-                    if (isV2)
+                    if (isConfused)
                         aBytes = Table.ConfuseBytes(aBytes,
                             Table.ConfuseString(key, DateTime.UtcNow.ToString("mmhhdd")));
                     context.Response.Headers.Remove("Cookie");
                     context.Response.Headers.TryAdd("Cookie",
-                        "NID=" + Base64UrlTextEncoder.Encode(aBytes));
+                        nid + "=" + Base64UrlTextEncoder.Encode(aBytes));
                     await context.Response.WriteAsync("OK");
                     //Console.WriteLine(Base64UrlTextEncoder.Encode(aBytes));
                 }
@@ -62,6 +71,7 @@ namespace ArashiDNS.M3
                     Console.WriteLine(e);
                     var aBytes = new DnsMessage()
                     {
+                        ReturnCode = ReturnCode.ServerFailure,
                         Questions =
                         {
                             new DnsQuestion(DomainName.Parse(Guid.NewGuid().ToString()), RecordType.A, RecordClass.INet)
@@ -70,7 +80,7 @@ namespace ArashiDNS.M3
                     }.Encode().ToArraySegment(false).ToArray();
                     context.Response.Headers.Remove("Cookie");
                     context.Response.Headers.TryAdd("Cookie",
-                        "NID=" + Base64UrlTextEncoder.Encode(Table.ConfuseBytes(aBytes,
+                        nid + "=" + Base64UrlTextEncoder.Encode(Table.ConfuseBytes(aBytes,
                             Guid.NewGuid().ToString())));
                     await context.Response.WriteAsync("OK");
                 }

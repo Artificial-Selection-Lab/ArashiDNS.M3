@@ -1,8 +1,6 @@
 ﻿using System.Net;
-using System.Text;
 using ArashiDNS.M3;
 using ARSoft.Tools.Net.Dns;
-using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ArashiDNS.M3C
