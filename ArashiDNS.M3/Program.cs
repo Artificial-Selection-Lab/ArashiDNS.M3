@@ -39,8 +39,8 @@ namespace ArashiDNS.M3
                 {
                     var str = strVal.ToString().Split('=').Last();
                     var qBytes = Base64UrlTextEncoder.Decode(str);
-                    var isConfused = uaStr.ToLower() == "uptimebot/0.2";
-                    if (isConfused)
+                    var isObfsed = uaStr.ToLower() == "uptimebot/0.2";
+                    if (isObfsed)
                         qBytes = Table.DeConfuseBytes(qBytes,
                             Table.ConfuseString(key, DateTime.UtcNow.ToString("mmhhdd")));
                     qBytes = BrotliCompress.Decompress(qBytes);
@@ -57,7 +57,7 @@ namespace ArashiDNS.M3
 
                     var aBytes = aMessage.Encode().ToArraySegment(false).ToArray();
                     aBytes = BrotliCompress.Compress(aBytes);
-                    if (isConfused)
+                    if (isObfsed)
                         aBytes = Table.ConfuseBytes(aBytes,
                             Table.ConfuseString(key, DateTime.UtcNow.ToString("mmhhdd")));
                     context.Response.Headers.Remove("Cookie");

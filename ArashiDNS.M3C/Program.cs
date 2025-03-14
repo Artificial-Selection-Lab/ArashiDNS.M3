@@ -1,6 +1,9 @@
-﻿using System.Net;
+﻿using System.IO;
+using System.Net;
 using ArashiDNS.M3;
 using ARSoft.Tools.Net.Dns;
+using McMaster.Extensions.CommandLineUtils;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ArashiDNS.M3C
@@ -13,29 +16,70 @@ namespace ArashiDNS.M3C
         public static IPEndPoint ListenerEndPoint = new(IPAddress.Loopback, 3353);
         public static string ServerUrl = "http://localhost:5135/healthz";
         public static string Key = "M33K";
-        public static bool IsConfused = true;
+        public static bool IsObfsed = true;
         public static string Nid = "NID";
 
 
         static void Main(string[] args)
         {
-
-            var dnsServer = new DnsServer(new UdpServerTransport(ListenerEndPoint),
-                new TcpServerTransport(ListenerEndPoint));
-            dnsServer.QueryReceived += DnsServerOnQueryReceived;
-            dnsServer.Start();
-
-            Console.WriteLine("Now listening on: " + ListenerEndPoint);
-            Console.WriteLine("Application started. Press Ctrl+C / q to shut down.");
-            if (!Console.IsInputRedirected && Console.KeyAvailable)
+            var cmd = new CommandLineApplication
             {
-                while (true)
-                    if (Console.ReadKey().KeyChar == 'q')
-                        Environment.Exit(0);
-            }
+                Name = "ArashiDNS.M3",
+                Description = "ArashiDNS.M3 -  Like DNS over Meek, but not. " +
+                              Environment.NewLine +
+                              $"Copyright (c) {DateTime.Now.Year} AS-Lab. Code released under the MIT License"
+            };
+            cmd.HelpOption("-?|-h|--help");
+            var isZh = Thread.CurrentThread.CurrentCulture.Name.Contains("zh");
+            var urlArgument = cmd.Argument("target",
+                isZh ? "目标 M3 服务器 URL。" : "Target M3 service URL");
+            var ipOption = cmd.Option<string>("-l|--listen <IPEndPoint>",
+                isZh ? "监听的地址与端口。" : "Set server listening address and port",
+                CommandOptionType.SingleValue);
+            var keyOption = cmd.Option<string>("-k|--key <KEY>",
+                isZh ? "混淆密钥。" : "Confusion key",
+                CommandOptionType.SingleValue);
+            var nidOption = cmd.Option<string>("-n|--nid <NID>",
+                isZh ? "NID Cookie 名称。" : "NID Cookie name",
+                CommandOptionType.SingleValue);
+            var noObfsOption = cmd.Option<bool>("--no-obfs",
+                isZh ? "不使用混淆，仅压缩。" : "No obfs, only compression",
+                CommandOptionType.NoValue);
 
-            EventWaitHandle wait = new AutoResetEvent(false);
-            while (true) wait.WaitOne();
+            cmd.OnExecute(() =>
+            {
+                if (ipOption.HasValue())
+                    ListenerEndPoint = IPEndPoint.Parse(ipOption.Value());
+                if (keyOption.HasValue())
+                    Key = keyOption.Value();
+                if (nidOption.HasValue())
+                    Nid = nidOption.Value();
+                if (urlArgument.Values.Count > 0)
+                    ServerUrl = urlArgument.Values[0];
+                if (noObfsOption.HasValue()) IsObfsed = false;
+
+                Console.WriteLine("Key  :" + Key);
+                Console.WriteLine("URL  :" + ServerUrl);
+                Console.WriteLine("Obfs :" + IsObfsed);
+
+                var dnsServer = new DnsServer(new UdpServerTransport(ListenerEndPoint),
+                    new TcpServerTransport(ListenerEndPoint));
+                dnsServer.QueryReceived += DnsServerOnQueryReceived;
+                dnsServer.Start();
+
+                Console.WriteLine("Now listening on: " + ListenerEndPoint);
+                Console.WriteLine("Application started. Press Ctrl+C / q to shut down.");
+                if (!Console.IsInputRedirected && Console.KeyAvailable)
+                {
+                    while (true)
+                        if (Console.ReadKey().KeyChar == 'q')
+                            Environment.Exit(0);
+                }
+
+                EventWaitHandle wait = new AutoResetEvent(false);
+                while (true) wait.WaitOne();
+            });
+            cmd.Execute(args);
         }
 
         private static async Task DnsServerOnQueryReceived(object sender, QueryReceivedEventArgs e)
@@ -45,7 +89,7 @@ namespace ArashiDNS.M3C
             var request = new HttpRequestMessage(HttpMethod.Get, ServerUrl);
             var qBytes = query.Encode().ToArraySegment(false).ToArray();
             qBytes = BrotliCompress.Compress(qBytes);
-            if (IsConfused)
+            if (IsObfsed)
             {
                 request.Headers.Add("User-Agent", "UptimeBot/0.2");
                 qBytes = Table.ConfuseBytes(qBytes,
@@ -66,7 +110,7 @@ namespace ArashiDNS.M3C
                 if (response.Headers.TryGetValues("Cookie", out var dataValues))
                 {
                     var aBytes = fromBase64StringGetBytes(dataValues.First().Split('=').Last());
-                    if (IsConfused)
+                    if (IsObfsed)
                         aBytes = Table.DeConfuseBytes(aBytes,
                             Table.ConfuseString(Key, DateTime.UtcNow.ToString("mmhhdd")));
                     aBytes = BrotliCompress.Decompress(aBytes);
