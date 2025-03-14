@@ -11,9 +11,10 @@ namespace ArashiDNS.M3C
         public static IHttpClientFactory? ClientFactory = ServiceProvider.GetService<IHttpClientFactory>();
 
         public static IPEndPoint ListenerEndPoint = new(IPAddress.Loopback, 3353);
-        public static string Server = "http://localhost:5135/healthz";
-        public static string SimpleKey = "M33K";
-        public static bool IsV2 = true;
+        public static string ServerUrl = "http://localhost:5135/healthz";
+        public static string Key = "M33K";
+        public static bool IsConfused = true;
+        public static string Nid = "NID";
 
 
         static void Main(string[] args)
@@ -41,17 +42,17 @@ namespace ArashiDNS.M3C
         {
             if (e.Query is not DnsMessage query) return;
 
-            var request = new HttpRequestMessage(HttpMethod.Get, Server);
+            var request = new HttpRequestMessage(HttpMethod.Get, ServerUrl);
             var qBytes = query.Encode().ToArraySegment(false).ToArray();
             qBytes = BrotliCompress.Compress(qBytes);
-            if (IsV2)
+            if (IsConfused)
             {
                 request.Headers.Add("User-Agent", "UptimeBot/0.2");
                 qBytes = Table.ConfuseBytes(qBytes,
-                    Table.ConfuseString(SimpleKey, DateTime.UtcNow.ToString("mmhhdd")));
+                    Table.ConfuseString(Key, DateTime.UtcNow.ToString("mmhhdd")));
             }
 
-            request.Headers.Add("Cookie", "NID=" + Convert
+            request.Headers.Add("Cookie", Nid + "=" + Convert
                 .ToBase64String(qBytes)
                 .TrimEnd('=').Replace('+', '-').Replace('/', '_'));
 
@@ -65,9 +66,9 @@ namespace ArashiDNS.M3C
                 if (response.Headers.TryGetValues("Cookie", out var dataValues))
                 {
                     var aBytes = fromBase64StringGetBytes(dataValues.First().Split('=').Last());
-                    if (IsV2)
+                    if (IsConfused)
                         aBytes = Table.DeConfuseBytes(aBytes,
-                            Table.ConfuseString(SimpleKey, DateTime.UtcNow.ToString("mmhhdd")));
+                            Table.ConfuseString(Key, DateTime.UtcNow.ToString("mmhhdd")));
                     aBytes = BrotliCompress.Decompress(aBytes);
                     e.Response = DnsMessage.Parse(aBytes);
                 }
