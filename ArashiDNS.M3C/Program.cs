@@ -29,7 +29,7 @@ namespace ArashiDNS.M3C
                               Environment.NewLine +
                               $"Copyright (c) {DateTime.Now.Year} AS-Lab. Code released under the MIT License"
             };
-            cmd.HelpOption("-?|-h|--help");
+            cmd.HelpOption("-?|-he|--help");
             var isZh = Thread.CurrentThread.CurrentCulture.Name.Contains("zh");
             var urlArgument = cmd.Argument("target",
                 isZh ? "目标 M3 服务器 URL。" : "Target M3 service URL");
